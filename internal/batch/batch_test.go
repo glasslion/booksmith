@@ -161,3 +161,56 @@ func TestBase(t *testing.T) {
 		}
 	}
 }
+
+func TestGlobIsCaseInsensitive(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, filepath.Join(dir, "a.MOBI"))
+	touch(t, filepath.Join(dir, "b.mobi"))
+	touch(t, filepath.Join(dir, "c.epub"))
+
+	got := glob(filepath.Join(dir, "*.mobi"))
+	equal(t, got, []string{abs(t, filepath.Join(dir, "a.MOBI")), abs(t, filepath.Join(dir, "b.mobi"))})
+}
+
+func TestGlobInSubdirectory(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, filepath.Join(dir, "sub", "书名.MOBI"))
+
+	got := glob(filepath.Join(dir, "sub", "*.mobi"))
+	equal(t, got, []string{abs(t, filepath.Join(dir, "sub", "书名.MOBI"))})
+}
+
+func TestGlobCharacterClass(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, filepath.Join(dir, "a.epub"))
+	touch(t, filepath.Join(dir, "b.epub"))
+	touch(t, filepath.Join(dir, "c.epub"))
+
+	got := glob(filepath.Join(dir, "[ab].epub"))
+	equal(t, got, []string{abs(t, filepath.Join(dir, "a.epub")), abs(t, filepath.Join(dir, "b.epub"))})
+}
+
+func TestExpandGlobIsCaseInsensitive(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, filepath.Join(dir, "Book.MOBI"))
+
+	got, err := Expand([]string{filepath.Join(dir, "*.mobi")}, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	equal(t, got, []string{abs(t, filepath.Join(dir, "Book.MOBI"))})
+}
+
+func TestGlobRelativePattern(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, filepath.Join(dir, "a.mobi"))
+	t.Chdir(dir)
+
+	got := glob("*.mobi")
+	if len(got) != 1 {
+		t.Fatalf("got %v", got)
+	}
+	if _, err := os.Stat(got[0]); err != nil {
+		t.Errorf("glob returned %q: %v", got[0], err)
+	}
+}

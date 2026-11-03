@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -68,14 +67,10 @@ func Expand(args []string, o Options) ([]string, error) {
 
 	for _, arg := range args {
 		if hasGlobMeta(arg) {
-			matches, err := filepath.Glob(arg)
-			if err != nil {
-				return nil, fmt.Errorf("bad pattern %q: %w", arg, err)
-			}
+			matches := glob(arg)
 			if len(matches) == 0 {
 				return nil, fmt.Errorf("no files match %q", arg)
 			}
-			sort.Strings(matches)
 			for _, m := range matches {
 				if err := collect(m, o, add); err != nil {
 					return nil, err

@@ -33,7 +33,8 @@ booksmith convert-recover [flags] <input>...
 
 `<input>` may be a file, a directory, or a glob pattern. **Globs are expanded by
 `booksmith`, not by the shell**, so `booksmith convert *.mobi` works in `cmd.exe` and
-PowerShell too.
+PowerShell too. Matching is case-insensitive on every platform, so `*.mobi` finds
+`Book.MOBI`.
 
 ```bash
 # convert a folder, recursively
@@ -122,6 +123,27 @@ calibre\
   calibre-debug.exe
   app\ ...
 ```
+
+On Windows `booksmith` switches the console output code page to UTF-8, so book titles and
+calibre's own messages are readable in `cmd.exe` and Windows PowerShell (which otherwise
+default to a legacy code page like 936).
+
+### macOS
+
+calibre's tools live inside the app bundle, so a `calibre/` directory next to the binary
+has to be assembled from symlinks:
+
+```bash
+brew install --cask calibre
+mkdir -p ~/bin/booksmith/calibre
+ln -sf /Applications/calibre.app/Contents/MacOS/ebook-convert ~/bin/booksmith/calibre/
+ln -sf /Applications/calibre.app/Contents/MacOS/calibre-debug  ~/bin/booksmith/calibre/
+cp dist/booksmith-darwin-arm64 ~/bin/booksmith/booksmith
+~/bin/booksmith/booksmith version
+```
+
+Without that, `booksmith` falls back to `PATH` — and a plain cask install does not put
+`ebook-convert` on `PATH`.
 
 ## License
 
