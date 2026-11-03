@@ -72,6 +72,7 @@ destructive, and there is deliberately no `--in-place`.
 | `--force` | `recover`, `convert-recover` | enable aggressive cover detection (first image in the book) when no cover marker exists |
 | `--no-svg-cover` | `recover`, `convert-recover` | generate a plain `<img>` cover page instead of calibre's SVG wrapper (better compatibility with older readers) |
 | `--keep-temp` | `recover`, `convert-recover` | keep the intermediate EPUBs for debugging |
+| `--calibre DIR` | all | look for calibre in `DIR` instead of the default search order |
 | `--dry-run` | all | print the calibre commands that would run |
 | `-v, --verbose` | all | stream calibre's own output |
 
@@ -80,14 +81,22 @@ destructive, and there is deliberately no `--in-place`.
 One line per input:
 
 ```
-Books/dune.mobi → Books/dune.epub                       ok    1.8s
-Books/emma.epub → Books/emma.recover.epub               ok    2.4s
-Books/same.epub → (exists)                              skip
-Books/broken.epub                                       fail  calibre: Cannot detect cover image
+D:\Books\dune.mobi -> D:\Books\dune.epub  ok 1.3s
+D:\Books\emma.epub -> D:\Books\emma.recover.epub  ok 1.5s
+D:\Books\same.epub -> D:\Books\same.epub  skip  would overwrite the input
+D:\Books\broken.epub -> D:\Books\broken.recover.epub  fail  calibre: <calibre's last error line>
 ```
 
 ```
-3 ok, 1 skipped, 1 failed
+1 ok, 2 skipped, 1 failed
+```
+
+`--dry-run` prints the exact commands instead, including the internal copy step:
+
+```
+copy D:\Books\emma.epub <tmp>\work.epub &&
+calibre-debug -e <tmp>\booksmith-strip-cover.py -- <tmp>\work.epub &&
+ebook-convert <tmp>\work.epub <tmp>\final.epub
 ```
 
 Exit code is `0` when nothing failed, `1` when at least one input failed, `2` on bad
@@ -102,6 +111,16 @@ make build            # native
 make windows          # → dist/booksmith.exe (amd64)
 make mac              # → dist/booksmith-darwin-arm64, -amd64
 make test
+```
+
+Put the binary next to a calibre directory and go:
+
+```
+booksmith.exe
+calibre\
+  ebook-convert.exe
+  calibre-debug.exe
+  app\ ...
 ```
 
 ## License

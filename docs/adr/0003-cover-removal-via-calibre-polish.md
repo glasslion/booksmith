@@ -1,6 +1,6 @@
 # 0003 — Cover removal is delegated to calibre's own polish API
 
-- Status: Proposed (awaiting user sign-off)
+- Status: Accepted
 - Date: 2026-11-03
 
 ## Context
@@ -60,7 +60,8 @@ Pipeline for `recover` / `convert-recover`:
 - We depend on calibre's internal Python API (`calibre.ebooks.oeb.polish`). A future
   calibre major could rename these functions. Mitigation: the call set is small and
   stable across 9.x, and a failure is reported per book with calibre's own stderr, so a
-  version break degrades to a clear error rather than a corrupted file.
+  version break degrades to a clear error rather than a corrupted file. There is no
+  silent fallback to option A — a broken API means that book **fails**.
 - No self-check of the produced cover: the user chose not to verify the output EPUB after
   conversion. A book whose strip or regeneration silently failed still counts as `ok`.
 - Each book costs one extra calibre process (~1s) for the strip step.

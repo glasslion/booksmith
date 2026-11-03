@@ -13,3 +13,9 @@ booksmith.exe
 *.swp
 .idea/
 .vscode/
+
+# stray artifacts from tests run in package dirs
+/a.epub
+/a.recover.epub
+/internal/**/a.epub
+/internal/**/a.azw3
