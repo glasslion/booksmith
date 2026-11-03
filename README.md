@@ -23,6 +23,10 @@ Windows) in this order:
 2. the binary's own directory;
 3. `PATH` — when this one is used, one line naming the resolved tool is printed.
 
+The lookup happens relative to the **binary**, not to the directory you run from:
+`..\dist\booksmith.exe convert *.mobi` started inside a books folder still looks in
+`dist\calibre\`.
+
 ## Usage
 
 ```
@@ -127,6 +131,13 @@ calibre\
 On Windows `booksmith` switches the console output code page to UTF-8, so book titles and
 calibre's own messages are readable in `cmd.exe` and Windows PowerShell (which otherwise
 default to a legacy code page like 936).
+
+Copying calibre (~700 MB) into `dist\calibre` is a waste; point it at a real installation
+with a directory junction instead:
+
+```powershell
+New-Item -ItemType Junction -Path dist\calibre -Target 'C:\Program Files\Calibre2'
+```
 
 ### macOS
 

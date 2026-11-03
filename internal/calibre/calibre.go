@@ -39,8 +39,10 @@ func Find(dir string) (Tools, error) {
 	if path, err := exec.LookPath("ebook-convert"); err == nil {
 		return withDebug(path, true)
 	}
-	return Tools{}, fmt.Errorf("calibre not found: no ebook-convert in %s, %s, or PATH "+
-		"(install calibre and put it in ./calibre/ next to this binary)", filepath.Join(dir, "calibre"), dir)
+	return Tools{}, fmt.Errorf("calibre not found: looked for ebook-convert in %s, %s and PATH\n"+
+		"(calibre is looked up next to this binary, not in the current directory; "+
+		"install calibre there, or point booksmith at it with --calibre DIR)",
+		filepath.Join(dir, "calibre"), dir)
 }
 
 func withDebug(ebookConvert string, fromPath bool) (Tools, error) {
