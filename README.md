@@ -14,18 +14,22 @@ It never touches a calibre library. See [GLOSSARY.md](GLOSSARY.md) for the vocab
 
 ## Requirements
 
-calibre must be installed. `booksmith` looks for `ebook-convert` (`ebook-convert.exe` on
-Windows) in this order:
+calibre must be installed. `booksmith` **never searches for it** — you tell it where
+calibre lives, once, in `config.json` next to the binary:
 
-1. `./calibre/` next to the `booksmith` binary — the recommended layout, since a calibre
-   installation is a whole directory (Qt, Python, `app/`) and cannot be reduced to a
-   single executable;
-2. the binary's own directory;
-3. `PATH` — when this one is used, one line naming the resolved tool is printed.
+```json
+{ "calibre_dir": "C:\\Program Files\\Calibre2" }
+```
 
-The lookup happens relative to the **binary**, not to the directory you run from:
-`..\dist\booksmith.exe convert *.mobi` started inside a books folder still looks in
-`dist\calibre\`.
+A relative `calibre_dir` is resolved against the directory holding `config.json`. The
+directory must contain `ebook-convert` and `calibre-debug` (`…exe` on Windows); a calibre
+installation is a whole directory (Qt, Python, `app/`) and cannot be reduced to a single
+executable. That is also why `booksmith` cannot bundle it.
+
+Prefer not to keep a file around? Pass `--calibre DIR` instead.
+
+If `config.json` is missing, `booksmith` prints the absolute path it wanted, a JSON
+template you can paste verbatim, and the `--calibre` alternative.
 
 ## Usage
 
@@ -77,7 +81,7 @@ destructive, and there is deliberately no `--in-place`.
 | `--force` | `recover`, `convert-recover` | enable aggressive cover detection (first image in the book) when no cover marker exists |
 | `--no-svg-cover` | `recover`, `convert-recover` | generate a plain `<img>` cover page instead of calibre's SVG wrapper (better compatibility with older readers) |
 | `--keep-temp` | `recover`, `convert-recover` | keep the intermediate EPUBs for debugging |
-| `--calibre DIR` | all | look for calibre in `DIR` instead of the default search order |
+| `--calibre DIR` | all | the calibre directory (default: `calibre_dir` from `config.json`) |
 | `--dry-run` | all | print the calibre commands that would run |
 | `-v, --verbose` | all | stream calibre's own output |
 
@@ -118,43 +122,28 @@ make mac              # → dist/booksmith-darwin-arm64, -amd64
 make test
 ```
 
-Put the binary next to a calibre directory and go:
+Put the binary anywhere and give it a `config.json`:
 
 ```
 booksmith.exe
-calibre\
-  ebook-convert.exe
-  calibre-debug.exe
-  app\ ...
+config.json      { "calibre_dir": "C:\\Program Files\\Calibre2" }
 ```
 
 On Windows `booksmith` switches the console output code page to UTF-8, so book titles and
 calibre's own messages are readable in `cmd.exe` and Windows PowerShell (which otherwise
 default to a legacy code page like 936).
 
-Copying calibre (~700 MB) into `dist\calibre` is a waste; point it at a real installation
-with a directory junction instead:
-
-```powershell
-New-Item -ItemType Junction -Path dist\calibre -Target 'C:\Program Files\Calibre2'
-```
-
 ### macOS
 
-calibre's tools live inside the app bundle, so a `calibre/` directory next to the binary
-has to be assembled from symlinks:
+calibre's tools live inside the app bundle, so point `calibre_dir` there:
 
 ```bash
 brew install --cask calibre
-mkdir -p ~/bin/booksmith/calibre
-ln -sf /Applications/calibre.app/Contents/MacOS/ebook-convert ~/bin/booksmith/calibre/
-ln -sf /Applications/calibre.app/Contents/MacOS/calibre-debug  ~/bin/booksmith/calibre/
-cp dist/booksmith-darwin-arm64 ~/bin/booksmith/booksmith
+mkdir -p ~/bin/booksmith && cp dist/booksmith-darwin-arm64 ~/bin/booksmith/booksmith
+printf '{ "calibre_dir": "/Applications/calibre.app/Contents/MacOS" }\n' \
+  > ~/bin/booksmith/config.json
 ~/bin/booksmith/booksmith version
 ```
-
-Without that, `booksmith` falls back to `PATH` — and a plain cask install does not put
-`ebook-convert` on `PATH`.
 
 ## License
 

@@ -20,8 +20,8 @@ tools (`ebook-convert`, `calibre-debug`) and owns only the things calibre's own 
 at: globbing on Windows, per-file outcomes, output naming, and one-line progress.
 
 calibre is a heavy directory (Qt, Python, `app/`), so it is never vendored into our
-binary and never copied into the output. It is expected to live in `./calibre/` next to
-the `booksmith` binary (or anywhere on `PATH`).
+binary and never copied into the output. Its location is supplied explicitly, via
+`--calibre` or `config.json` — see ADR-0004.
 
 ## Consequences
 
@@ -31,3 +31,6 @@ the `booksmith` binary (or anywhere on `PATH`).
   calibre failure must never look like a `booksmith` failure, and vice versa.
 - Users must install calibre themselves. `booksmith` fails loudly with an actionable
   message when it cannot find it, rather than shipping a broken conversion path.
+- Bundling calibre was evaluated and rejected: the tools cannot run without the whole
+  install (a lone `ebook-convert.exe` exits 1 printing nothing), and trimming it either
+  breaks outright or silently degrades generated covers — see ADR-0004.

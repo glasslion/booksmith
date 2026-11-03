@@ -1,11 +1,12 @@
-// Package calibre locates and runs calibre's command-line tools.
+// Package calibre resolves and runs calibre's command-line tools.
 //
-// A calibre installation is a whole directory (Qt, Python, app/), so we reference it
-// where it already lives instead of vendoring anything. See ADR-0001.
+// There is exactly one way to find calibre: it is specified, never guessed. Either the
+// --calibre flag, or "calibre_dir" in config.json next to this binary. See ADR-0004.
 package calibre
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,12 +16,18 @@ import (
 	"strings"
 )
 
+// ConfigFileName is the config file looked for next to the binary.
+const ConfigFileName = "config.json"
+
+// Config is the on-disk configuration.
+type Config struct {
+	CalibreDir string `json:"calibre_dir"`
+}
+
 // Tools are the resolved paths of the calibre executables we use.
 type Tools struct {
 	EbookConvert string
 	CalibreDebug string
-	// FromPath is true when the tools were found on PATH rather than next to our binary.
-	FromPath bool
 }
 
 // Dir returns the directory the calibre tools live in.
@@ -28,30 +35,48 @@ func (t Tools) Dir() string {
 	return filepath.Dir(t.EbookConvert)
 }
 
-// Find resolves calibre's tools. Search order: dir/calibre, dir, then PATH.
-func Find(dir string) (Tools, error) {
-	if path, ok := findIn(filepath.Join(dir, "calibre"), "ebook-convert"); ok {
-		return withDebug(path, false)
+// Resolve returns calibre's tools. The flag wins; otherwise config.json in exeDir is
+// read. Nothing is probed: a missing or broken specification is an error.
+func Resolve(flagDir, exeDir string) (Tools, error) {
+	if flagDir != "" {
+		return fromDir(flagDir)
 	}
-	if path, ok := findIn(dir, "ebook-convert"); ok {
-		return withDebug(path, false)
+	path := filepath.Join(exeDir, ConfigFileName)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return Tools{}, &NoConfigError{Path: path}
+		}
+		return Tools{}, fmt.Errorf("%s: %w", path, err)
 	}
-	if path, err := exec.LookPath("ebook-convert"); err == nil {
-		return withDebug(path, true)
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return Tools{}, &ConfigError{Path: path, Err: err}
 	}
-	return Tools{}, fmt.Errorf("calibre not found: looked for ebook-convert in %s, %s and PATH\n"+
-		"(calibre is looked up next to this binary, not in the current directory; "+
-		"install calibre there, or point booksmith at it with --calibre DIR)",
-		filepath.Join(dir, "calibre"), dir)
+	dir := strings.TrimSpace(cfg.CalibreDir)
+	if dir == "" {
+		return Tools{}, &ConfigError{Path: path, Err: errors.New(`"calibre_dir" is empty`)}
+	}
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(filepath.Dir(path), dir)
+	}
+	return fromDir(dir)
 }
 
-func withDebug(ebookConvert string, fromPath bool) (Tools, error) {
-	debug, ok := findIn(filepath.Dir(ebookConvert), "calibre-debug")
-	if !ok {
-		return Tools{}, fmt.Errorf("found %s but not calibre-debug in the same directory "+
-			"(both ship with calibre)", ebookConvert)
+func fromDir(dir string) (Tools, error) {
+	ebookConvert, ok := findIn(dir, "ebook-convert")
+	calibreDebug, debugOK := findIn(dir, "calibre-debug")
+	if !ok || !debugOK {
+		var missing []string
+		if !ok {
+			missing = append(missing, "ebook-convert")
+		}
+		if !debugOK {
+			missing = append(missing, "calibre-debug")
+		}
+		return Tools{}, &IncompleteError{Dir: dir, Missing: missing}
 	}
-	return Tools{EbookConvert: ebookConvert, CalibreDebug: debug, FromPath: fromPath}, nil
+	return Tools{EbookConvert: ebookConvert, CalibreDebug: calibreDebug}, nil
 }
 
 // findIn looks for name (or name.exe) in dir and returns a path that exists.
@@ -63,6 +88,47 @@ func findIn(dir, name string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// exampleConfig is what the error messages tell users to write, verbatim.
+const exampleConfig = `{ "calibre_dir": "C:\\Program Files\\Calibre2" }`
+
+// NoConfigError means calibre was never specified.
+type NoConfigError struct {
+	Path string
+}
+
+func (e *NoConfigError) Error() string {
+	return fmt.Sprintf(`no calibre configured: %s does not exist
+
+either pass the directory on the command line:
+
+  booksmith convert --calibre "C:\Program Files\Calibre2" book.mobi
+
+or create %s containing:
+
+  %s`, e.Path, e.Path, exampleConfig)
+}
+
+// ConfigError means config.json exists but does not hold a usable calibre_dir.
+type ConfigError struct {
+	Path string
+	Err  error
+}
+
+func (e *ConfigError) Error() string {
+	return fmt.Sprintf("%s: invalid config: %v\nexpected: %s", e.Path, e.Err, exampleConfig)
+}
+
+// IncompleteError means the configured directory is not a calibre installation.
+type IncompleteError struct {
+	Dir     string
+	Missing []string
+}
+
+func (e *IncompleteError) Error() string {
+	return fmt.Sprintf("%s: not a calibre installation: no %s in that directory",
+		e.Dir, strings.Join(e.Missing, " and no "))
 }
 
 // ExecutableDir returns the directory of the running binary.

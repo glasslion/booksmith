@@ -47,10 +47,22 @@ Letting calibre create its default generated cover from the book's title and aut
 calibre does this automatically when converting an EPUB that has no cover, and logs
 `Generating default cover`.
 
-## sibling calibre directory
+## calibre_dir
 
-`booksmith` locates calibre by looking for `ebook-convert` (`ebook-convert.exe` on
-Windows) in this order: `./calibre/` next to the executable, then the executable's own
-directory, then `PATH`. A calibre installation is a whole directory (Qt, Python,
-`app/`), so it is referenced, never copied. When the binary is found through `PATH`,
-`booksmith` prints one line naming the resolved tool.
+The one location calibre is taken from: the directory holding `ebook-convert` and
+`calibre-debug`. It comes from `--calibre DIR` or from `config.json`, and nowhere else —
+there is no searching, no `PATH` fallback, no standard-install-location detection. See
+ADR-0004.
+
+## config file
+
+`config.json`, looked up **next to the binary** (so a copied folder carries its settings).
+Currently it holds one key:
+
+```json
+{ "calibre_dir": "C:\\Program Files\\Calibre2" }
+```
+
+Missing, malformed, or pointing at a directory without the calibre tools are three
+distinct errors, each naming the file or directory at fault. `booksmith` never writes
+this file; you do.

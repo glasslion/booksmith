@@ -31,14 +31,26 @@ func (r *recorder) Run(ctx context.Context, tool string, args ...string) error {
 
 var fakeTools = calibre.Tools{EbookConvert: "/calibre/ebook-convert", CalibreDebug: "/calibre/calibre-debug"}
 
-// stub installs a fake calibre lookup and a recording runner for the duration of the test.
-func stub(t *testing.T, tools calibre.Tools, findErr error) *recorder {
+// stub installs a fake calibre resolution and a recording runner for the duration of the test.
+func stub(t *testing.T, tools calibre.Tools, resolveErr error) *recorder {
 	t.Helper()
 	rec := &recorder{}
-	oldFind, oldNew := findTools, newRunner
-	t.Cleanup(func() { findTools, newRunner = oldFind, oldNew })
-	findTools = func(string) (calibre.Tools, error) { return tools, findErr }
+	oldResolve, oldNew, oldExe := resolveTools, newRunner, exeDir
+	t.Cleanup(func() { resolveTools, newRunner, exeDir = oldResolve, oldNew, oldExe })
+	resolveTools = func(string, string) (calibre.Tools, error) { return tools, resolveErr }
 	newRunner = func(bool, io.Writer) calibre.Runner { return rec }
+	exeDir = func() (string, error) { return t.TempDir(), nil }
+	return rec
+}
+
+// stubRealResolve keeps the real resolver so tests can exercise config.json.
+func stubRealResolve(t *testing.T, dir string) *recorder {
+	t.Helper()
+	rec := &recorder{}
+	oldNew, oldExe := newRunner, exeDir
+	t.Cleanup(func() { newRunner, exeDir = oldNew, oldExe })
+	newRunner = func(bool, io.Writer) calibre.Runner { return rec }
+	exeDir = func() (string, error) { return dir, nil }
 	return rec
 }
 
@@ -143,19 +155,44 @@ func TestRunRecoverSkipsNonEpub(t *testing.T) {
 	}
 }
 
-func TestRunPrintsResolvedCalibreWhenFromPath(t *testing.T) {
-	dir := t.TempDir()
-	in := filepath.Join(dir, "a.mobi")
+func TestRunUsesConfigNextToBinary(t *testing.T) {
+	binDir := t.TempDir()
+	cal := filepath.Join(binDir, "Calibre2")
+	writeFile(t, filepath.Join(cal, "ebook-convert"), "")
+	writeFile(t, filepath.Join(cal, "calibre-debug"), "")
+	writeFile(t, filepath.Join(binDir, calibre.ConfigFileName), `{"calibre_dir": "Calibre2"}`)
+	rec := stubRealResolve(t, binDir)
+
+	books := t.TempDir()
+	in := filepath.Join(books, "a.mobi")
 	writeFile(t, in, "book")
-	tools := fakeTools
-	tools.FromPath = true
-	stub(t, tools, nil)
 
 	var out, errOut bytes.Buffer
-	Run([]string{"convert", in}, &out, &errOut)
+	if code := Run([]string{"convert", in}, &out, &errOut); code != 0 {
+		t.Fatalf("exit = %d, stderr = %s", code, errOut.String())
+	}
+	if len(rec.calls) != 1 {
+		t.Fatalf("calls = %v", rec.calls)
+	}
+	if want := filepath.Join(cal, "ebook-convert"); !strings.HasPrefix(rec.calls[0], want) {
+		t.Errorf("calibre came from %q, want %q", rec.calls[0], want)
+	}
+}
 
-	if !strings.Contains(out.String(), "calibre: using /calibre/ebook-convert (from PATH)") {
-		t.Errorf("stdout = %q", out.String())
+func TestRunWithoutConfigOrFlagFails(t *testing.T) {
+	binDir := t.TempDir()
+	stubRealResolve(t, binDir)
+
+	books := t.TempDir()
+	in := filepath.Join(books, "a.mobi")
+	writeFile(t, in, "book")
+
+	var out, errOut bytes.Buffer
+	if code := Run([]string{"convert", in}, &out, &errOut); code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+	if !strings.Contains(errOut.String(), filepath.Join(binDir, calibre.ConfigFileName)) {
+		t.Errorf("stderr should name the config file: %q", errOut.String())
 	}
 }
 

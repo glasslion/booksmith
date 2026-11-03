@@ -19,8 +19,9 @@ const Version = "0.1.0"
 
 // Swappable in tests.
 var (
-	findTools = func(dir string) (calibre.Tools, error) { return calibre.Find(dir) }
-	newRunner = func(verbose bool, out io.Writer) calibre.Runner {
+	resolveTools = calibre.Resolve
+	exeDir       = calibre.ExecutableDir
+	newRunner    = func(verbose bool, out io.Writer) calibre.Runner {
 		return calibre.Executor{Verbose: verbose, Out: out}
 	}
 )
@@ -100,20 +101,15 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	searchDir := calibreDir
-	if searchDir == "" {
-		if searchDir, err = calibre.ExecutableDir(); err != nil {
-			fmt.Fprintf(stderr, "booksmith: cannot determine own location: %v\n", err)
-			return 2
-		}
+	dir, err := exeDir()
+	if err != nil {
+		fmt.Fprintf(stderr, "booksmith: cannot determine own location: %v\n", err)
+		return 2
 	}
-	tools, err := findTools(searchDir)
+	tools, err := resolveTools(calibreDir, dir)
 	if err != nil {
 		fmt.Fprintf(stderr, "booksmith: %v\n", err)
 		return 2
-	}
-	if tools.FromPath {
-		fmt.Fprintf(stdout, "calibre: using %s (from PATH)\n", tools.EbookConvert)
 	}
 
 	if outDir != "" {
@@ -188,9 +184,14 @@ Flags:
       --all            don't restrict directory scans to ebook extensions
       --no-svg-cover   recover: plain <img> cover page instead of calibre's SVG wrapper
       --keep-temp      recover: keep intermediate files for debugging
-      --calibre DIR    look for calibre in DIR (default: next to this binary, then PATH)
+      --calibre DIR    the calibre directory (default: from config.json, see below)
       --dry-run        print the calibre commands instead of running them
   -v, --verbose        stream calibre's own output
+
+calibre is never searched for. It is either given with --calibre, or read from
+config.json next to this binary:
+
+  { "calibre_dir": "C:\\Program Files\\Calibre2" }
 
 Exit codes: 0 all good, 1 at least one input failed, 2 bad usage.
 

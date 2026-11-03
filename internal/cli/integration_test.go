@@ -11,12 +11,12 @@ import (
 )
 
 // stubCalibre writes a fake calibre directory whose tools log their argv. Real processes
-// run, so this covers discovery, argument passing and stderr capture end to end.
-func stubCalibre(t *testing.T) (root, logPath string) {
+// run, so this covers resolution, argument passing and stderr capture end to end.
+func stubCalibre(t *testing.T) (calibreDir, logPath string) {
 	t.Helper()
-	root = t.TempDir()
+	root := t.TempDir()
 	logPath = filepath.Join(root, "calls.log")
-	cal := filepath.Join(root, "calibre")
+	cal := filepath.Join(root, "Calibre2")
 
 	ebookConvert := `#!/bin/sh
 echo "ebook-convert $*" >> "$BOOKSMITH_STUB_LOG"
@@ -38,7 +38,7 @@ echo "calibre-debug $*" >> "$BOOKSMITH_STUB_LOG"
 		}
 	}
 	t.Setenv("BOOKSMITH_STUB_LOG", logPath)
-	return root, logPath
+	return cal, logPath
 }
 
 func readLog(t *testing.T, path string) string {
@@ -51,7 +51,7 @@ func readLog(t *testing.T, path string) string {
 }
 
 func TestIntegrationConvert(t *testing.T) {
-	root, logPath := stubCalibre(t)
+	calDir, logPath := stubCalibre(t)
 	books := t.TempDir()
 	in := filepath.Join(books, "a.mobi")
 	if err := os.WriteFile(in, []byte("book"), 0o644); err != nil {
@@ -59,7 +59,7 @@ func TestIntegrationConvert(t *testing.T) {
 	}
 
 	var out, errOut bytes.Buffer
-	if code := Run([]string{"convert", "--calibre", root, in}, &out, &errOut); code != 0 {
+	if code := Run([]string{"convert", "--calibre", calDir, in}, &out, &errOut); code != 0 {
 		t.Fatalf("exit = %d, stderr = %s", code, errOut.String())
 	}
 	if _, err := os.Stat(filepath.Join(books, "a.epub")); err != nil {
@@ -75,7 +75,7 @@ func TestIntegrationConvert(t *testing.T) {
 }
 
 func TestIntegrationRecoverRunsBothToolsInOrder(t *testing.T) {
-	root, logPath := stubCalibre(t)
+	calDir, logPath := stubCalibre(t)
 	books := t.TempDir()
 	in := filepath.Join(books, "a.epub")
 	if err := os.WriteFile(in, []byte("book"), 0o644); err != nil {
@@ -83,7 +83,7 @@ func TestIntegrationRecoverRunsBothToolsInOrder(t *testing.T) {
 	}
 
 	var out, errOut bytes.Buffer
-	if code := Run([]string{"recover", "--calibre", root, in}, &out, &errOut); code != 0 {
+	if code := Run([]string{"recover", "--calibre", calDir, in}, &out, &errOut); code != 0 {
 		t.Fatalf("exit = %d, stderr = %s", code, errOut.String())
 	}
 	if _, err := os.Stat(filepath.Join(books, "a.recover.epub")); err != nil {
@@ -103,7 +103,7 @@ func TestIntegrationRecoverRunsBothToolsInOrder(t *testing.T) {
 }
 
 func TestIntegrationCalibreFailureIsReported(t *testing.T) {
-	root, _ := stubCalibre(t)
+	calDir, _ := stubCalibre(t)
 	t.Setenv("BOOKSMITH_STUB_FAIL", "1")
 	books := t.TempDir()
 	in := filepath.Join(books, "a.mobi")
@@ -112,7 +112,7 @@ func TestIntegrationCalibreFailureIsReported(t *testing.T) {
 	}
 
 	var out, errOut bytes.Buffer
-	code := Run([]string{"convert", "--calibre", root, in}, &out, &errOut)
+	code := Run([]string{"convert", "--calibre", calDir, in}, &out, &errOut)
 
 	if code != 1 {
 		t.Errorf("exit = %d, want 1", code)
