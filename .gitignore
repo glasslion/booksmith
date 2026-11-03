@@ -1,0 +1,15 @@
+# build output
+/dist/
+/bin/
+booksmith
+booksmith.exe
+
+# local test material: real books are never committed
+/testdata/*
+!/testdata/README.md
+
+# editor/OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
